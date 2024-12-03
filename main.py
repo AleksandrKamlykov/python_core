@@ -1,37 +1,111 @@
-def find_min(numbers):
-    if not numbers:
-        return None
-    return min(numbers)
+class TicTacToe:
+    def __init__(self):
+        self.board = [' ' for _ in range(9)]
+        self.current_winner = None
 
-def is_palindrome(s):
-    return s == s[::-1]
+    def print_board(self):
+        for row in [self.board[i * 3:(i + 1) * 3] for i in range(3)]:
+            print('| ' + ' | '.join(row) + ' |')
 
-def unique_elements(lst):
-    return list(set(lst))
+    @staticmethod
+    def print_board_nums():
+        number_board = [[str(i) for i in range(j * 3, (j + 1) * 3)] for j in range(3)]
+        for row in number_board:
+            print('| ' + ' | '.join(row) + ' |')
 
-def are_anagrams(s1, s2):
-    return sorted(s1) == sorted(s2)
+    def available_moves(self):
+        return [i for i, spot in enumerate(self.board) if spot == ' ']
 
-# Example usage of find_min
-numbers = [3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5]
-print(find_min(numbers))  # Output: 1
+    def empty_squares(self):
+        return ' ' in self.board
 
-# Example usage of is_palindrome
-s = "racecar"
-print(is_palindrome(s))  # Output: True
+    def num_empty_squares(self):
+        return self.board.count(' ')
 
-s = "hello"
-print(is_palindrome(s))  # Output: False
+    def make_move(self, square, letter):
+        if self.board[square] == ' ':
+            self.board[square] = letter
+            if self.winner(square, letter):
+                self.current_winner = letter
+            return True
+        return False
 
-# Example usage of unique_elements
-lst = [1, 2, 2, 3, 4, 4, 5]
-print(unique_elements(lst))  # Output: [1, 2, 3, 4, 5]
+    def winner(self, square, letter):
+        row_ind = square // 3
+        row = self.board[row_ind * 3:(row_ind + 1) * 3]
+        if all([spot == letter for spot in row]):
+            return True
 
-# Example usage of are_anagrams
-s1 = "listen"
-s2 = "silent"
-print(are_anagrams(s1, s2))  # Output: True
+        col_ind = square % 3
+        column = [self.board[col_ind + i * 3] for i in range(3)]
+        if all([spot == letter for spot in column]):
+            return True
 
-s1 = "hello"
-s2 = "world"
-print(are_anagrams(s1, s2))  # Output: False
+        if square % 2 == 0:
+            diagonal1 = [self.board[i] for i in [0, 4, 8]]
+            if all([spot == letter for spot in diagonal1]):
+                return True
+            diagonal2 = [self.board[i] for i in [2, 4, 6]]
+            if all([spot == letter for spot in diagonal2]):
+                return True
+
+        return False
+
+
+class HumanPlayer:
+    def __init__(self, letter):
+        self.letter = letter
+
+    def get_move(self, game:TicTacToe):
+        valid_square = False
+        val = None
+        while not valid_square:
+            square = input(self.letter + '\'s turn. Input move (0-8): ')
+            try:
+                val = int(square)
+                if val not in game.available_moves():
+                    raise ValueError
+                valid_square = True
+            except ValueError:
+                print('Invalid square. Try again.')
+        return val
+
+
+
+def play(game:TicTacToe, x_player:HumanPlayer, o_player:HumanPlayer, print_game=True):
+    if print_game:
+        game.print_board_nums()
+
+    letter = 'X'
+    while game.empty_squares():
+        if letter == 'O':
+            square = o_player.get_move(game)
+        else:
+            square = x_player.get_move(game)
+
+        if game.make_move(square, letter):
+            if print_game:
+                print(letter + f' makes a move to square {square}')
+                game.print_board()
+                print('')
+
+            if game.current_winner:
+                if print_game:
+                    print(letter + ' wins!')
+                return letter
+
+            letter = 'O' if letter == 'X' else 'X'
+
+    if print_game:
+        print('It\'s a tie!')
+
+
+
+
+if __name__ == '__main__':
+    x = input('Enter the first player name: ')
+    o = input('Enter the second player name: ')
+    x_player = HumanPlayer(x)
+    o_player = HumanPlayer(o)
+    t = TicTacToe()
+    play(t, x_player, o_player)
