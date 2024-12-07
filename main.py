@@ -1,111 +1,96 @@
-class TicTacToe:
-    def __init__(self):
-        self.board = [' ' for _ in range(9)]
-        self.current_winner = None
+import random
+import uuid
+import time
+import os
+import sys
 
-    def print_board(self):
-        for row in [self.board[i * 3:(i + 1) * 3] for i in range(3)]:
-            print('| ' + ' | '.join(row) + ' |')
+class Molecule:
+    def __init__(self, energy, speed, interaction_radius):
+        self.id = uuid.uuid4()
+        self.energy = energy
+        self.speed = speed
+        self.interaction_radius = interaction_radius
+        self.x = random.uniform(0, 100)
+        self.y = random.uniform(0, 100)
 
-    @staticmethod
-    def print_board_nums():
-        number_board = [[str(i) for i in range(j * 3, (j + 1) * 3)] for j in range(3)]
-        for row in number_board:
-            print('| ' + ' | '.join(row) + ' |')
+    def move(self):
+        self.x += random.uniform(-self.speed, self.speed)
+        self.y += random.uniform(-self.speed, self.speed)
+        self.x = max(0, min(99, self.x))
+        self.y = max(0, min(99, self.y))
 
-    def available_moves(self):
-        return [i for i, spot in enumerate(self.board) if spot == ' ']
+    def interact(self, other):
+        distance = ((self.x - other.x) ** 2 + (self.y - other.y) ** 2) ** 0.5
+        if distance <= self.interaction_radius:
+            if self.energy > other.energy:
+                self.energy += other.energy // 2
+                other.energy //= 2
+            else:
+                other.energy += self.energy // 2
+                self.energy //= 2
 
-    def empty_squares(self):
-        return ' ' in self.board
+    def mutate(self):
+        if random.random() < 0.01:
+            self.energy += random.randint(-10, 10)
+            self.speed *= random.uniform(0.9, 1.1)
+            self.interaction_radius += random.randint(-1, 1)
 
-    def num_empty_squares(self):
-        return self.board.count(' ')
+class Environment:
+    def __init__(self, width, height, initial_molecule_count):
+        self.width = width
+        self.height = height
+        self.molecules = [self.spawn_molecule() for _ in range(initial_molecule_count)]
 
-    def make_move(self, square, letter):
-        if self.board[square] == ' ':
-            self.board[square] = letter
-            if self.winner(square, letter):
-                self.current_winner = letter
-            return True
-        return False
+    def spawn_molecule(self):
+        return Molecule(
+            energy=random.randint(50, 100),
+            speed=random.uniform(0.5, 2.0),
+            interaction_radius=random.randint(1, 5)
+        )
 
-    def winner(self, square, letter):
-        row_ind = square // 3
-        row = self.board[row_ind * 3:(row_ind + 1) * 3]
-        if all([spot == letter for spot in row]):
-            return True
+    def remove_molecule(self, molecule):
+        self.molecules.remove(molecule)
 
-        col_ind = square % 3
-        column = [self.board[col_ind + i * 3] for i in range(3)]
-        if all([spot == letter for spot in column]):
-            return True
+    def step(self):
+        for molecule in self.molecules:
+            molecule.move()
+            for other in self.molecules:
+                if molecule != other:
+                    molecule.interact(other)
+            if molecule.energy <= 0:
+                self.remove_molecule(molecule)
+            molecule.mutate()
+        if random.random() < 0.05:
+            self.molecules.append(self.spawn_molecule())
+        return  self.visualize()
 
-        if square % 2 == 0:
-            diagonal1 = [self.board[i] for i in [0, 4, 8]]
-            if all([spot == letter for spot in diagonal1]):
-                return True
-            diagonal2 = [self.board[i] for i in [2, 4, 6]]
-            if all([spot == letter for spot in diagonal2]):
-                return True
+    def visualize(self):
 
-        return False
+        field = ""
 
+        grid = [['.' for _ in range(self.width)] for _ in range(self.height)]
+        for molecule in self.molecules:
+            x, y = int(molecule.x), int(molecule.y)
+            if 0 <= x < self.width and 0 <= y < self.height:
+                grid[y][x] = str(molecule.energy)#'O'
 
-class HumanPlayer:
-    def __init__(self, letter):
-        self.letter = letter
+        for row in grid:
+            field += ''.join(row) + "\n"
 
-    def get_move(self, game:TicTacToe):
-        valid_square = False
-        val = None
-        while not valid_square:
-            square = input(self.letter + '\'s turn. Input move (0-8): ')
-            try:
-                val = int(square)
-                if val not in game.available_moves():
-                    raise ValueError
-                valid_square = True
-            except ValueError:
-                print('Invalid square. Try again.')
-        return val
+        field += "\n" + "-" * self.width + "\n"
 
-
-
-def play(game:TicTacToe, x_player:HumanPlayer, o_player:HumanPlayer, print_game=True):
-    if print_game:
-        game.print_board_nums()
-
-    letter = 'X'
-    while game.empty_squares():
-        if letter == 'O':
-            square = o_player.get_move(game)
-        else:
-            square = x_player.get_move(game)
-
-        if game.make_move(square, letter):
-            if print_game:
-                print(letter + f' makes a move to square {square}')
-                game.print_board()
-                print('')
-
-            if game.current_winner:
-                if print_game:
-                    print(letter + ' wins!')
-                return letter
-
-            letter = 'O' if letter == 'X' else 'X'
-
-    if print_game:
-        print('It\'s a tie!')
+        return field
 
 
+def run_simulation(steps, initial_molecule_count):
+    os.environ['TERM'] = 'xterm-256color'
+    env = Environment(100, 30, initial_molecule_count)
+    for _ in range(steps):
+        f = env.step()
+        sys.stdout.write('\033[2J\033[H')
+        sys.stdout.flush()
+        print(f)
+        time.sleep(0.33)
 
-
-if __name__ == '__main__':
-    x = input('Enter the first player name: ')
-    o = input('Enter the second player name: ')
-    x_player = HumanPlayer(x)
-    o_player = HumanPlayer(o)
-    t = TicTacToe()
-    play(t, x_player, o_player)
+if __name__ == "__main__":
+    run_simulation(steps=1000, initial_molecule_count=50)
