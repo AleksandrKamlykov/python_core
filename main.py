@@ -1,96 +1,147 @@
-import random
-import uuid
-import time
-import os
-import sys
+import json
+from typing import List
 
-class Molecule:
-    def __init__(self, energy, speed, interaction_radius):
-        self.id = uuid.uuid4()
-        self.energy = energy
-        self.speed = speed
-        self.interaction_radius = interaction_radius
-        self.x = random.uniform(0, 100)
-        self.y = random.uniform(0, 100)
+class Book:
+    def __init__(self, title, author):
+        self.title = title
+        self.author = author
 
-    def move(self):
-        self.x += random.uniform(-self.speed, self.speed)
-        self.y += random.uniform(-self.speed, self.speed)
-        self.x = max(0, min(99, self.x))
-        self.y = max(0, min(99, self.y))
+    def __str__(self):
+        return f"{self.title} by {self.author}"
 
-    def interact(self, other):
-        distance = ((self.x - other.x) ** 2 + (self.y - other.y) ** 2) ** 0.5
-        if distance <= self.interaction_radius:
-            if self.energy > other.energy:
-                self.energy += other.energy // 2
-                other.energy //= 2
+class BookController:
+
+    __filename = "books.json"
+
+    def __init__(self):
+        self.books: List[Book] = []
+
+    def add_book(self, title, author):
+        book = Book(title, author)
+        self.books.append(book)
+        self.save_books()
+
+    def list_books(self):
+        return self.books
+
+    def find_index_by_title(self, title):
+        for index, book in enumerate(self.books):
+            if book.title.lower() == title.lower():
+                return index
+        return -1
+
+    def find_index_by_author(self, author):
+        for index, book in enumerate(self.books):
+            if book.author.lower() == author.lower():
+                return index
+        return -1
+
+
+    def find_book_by_name(self, title):
+        idx = self.find_index_by_title(title)
+        if idx == -1:
+            return None
+
+        return self.books[idx]
+
+    def find_book_by_author(self, author):
+        idx = self.find_index_by_author(author)
+        if idx == -1:
+            return None
+
+        return self.books[idx]
+
+    def remove_book(self, title):
+
+        idx = self.find_index_by_title(title)
+        if idx == -1:
+            return None
+
+        self.save_books()
+
+        return self.books.pop(idx)
+
+
+    def save_books(self):
+        with open(self.__filename, 'w') as file:
+            json.dump([book.__dict__ for book in self.books], file)
+
+    def load_books(self):
+        try:
+            with open(self.__filename, 'r') as file:
+                books_data = json.load(file)
+                self.books = [Book(**data) for data in books_data]
+        except FileNotFoundError:
+            self.books = []
+
+
+
+class BookView:
+    def __init__(self, controller:BookController):
+        self.controller = controller
+        self.controller.load_books()
+
+    def add_book(self):
+        title = input("Enter the title of the book: ")
+        author = input("Enter the author of the book: ")
+        self.controller.add_book(title, author)
+
+    def list_books(self):
+        books = self.controller.list_books()
+        for book in books:
+            print(book)
+
+    def find_book_by_name(self):
+        title = input("Enter the title of the book: ")
+        book = self.controller.find_book_by_name(title)
+        if book:
+            print(book)
+        else:
+            print("Book not found")
+
+    def find_book_by_author(self):
+        author = input("Enter the author of the book: ")
+        book = self.controller.find_book_by_author(author)
+        if book:
+            print(book)
+        else:
+            print("Book not found")
+
+    def remove_book(self):
+        title = input("Enter the title of the book: ")
+        book = self.controller.remove_book(title)
+        if book:
+            print(f"Removed book: {book}")
+        else:
+            print("Book not found")
+
+    def run(self):
+
+        while True:
+            print("1. Add book")
+            print("2. List books")
+            print("3. Find book by name")
+            print("4. Find book by author")
+            print("5. Remove book")
+            print("6. Exit")
+            choice = input("Enter your choice: ")
+
+            if choice == "1":
+                self.add_book()
+            elif choice == "2":
+                self.list_books()
+            elif choice == "3":
+                self.find_book_by_name()
+            elif choice == "4":
+                self.find_book_by_author()
+            elif choice == "5":
+                self.remove_book()
+            elif choice == "6":
+                break
             else:
-                other.energy += self.energy // 2
-                self.energy //= 2
+                print("Invalid choice")
 
-    def mutate(self):
-        if random.random() < 0.01:
-            self.energy += random.randint(-10, 10)
-            self.speed *= random.uniform(0.9, 1.1)
-            self.interaction_radius += random.randint(-1, 1)
-
-class Environment:
-    def __init__(self, width, height, initial_molecule_count):
-        self.width = width
-        self.height = height
-        self.molecules = [self.spawn_molecule() for _ in range(initial_molecule_count)]
-
-    def spawn_molecule(self):
-        return Molecule(
-            energy=random.randint(50, 100),
-            speed=random.uniform(0.5, 2.0),
-            interaction_radius=random.randint(1, 5)
-        )
-
-    def remove_molecule(self, molecule):
-        self.molecules.remove(molecule)
-
-    def step(self):
-        for molecule in self.molecules:
-            molecule.move()
-            for other in self.molecules:
-                if molecule != other:
-                    molecule.interact(other)
-            if molecule.energy <= 0:
-                self.remove_molecule(molecule)
-            molecule.mutate()
-        if random.random() < 0.05:
-            self.molecules.append(self.spawn_molecule())
-        return  self.visualize()
-
-    def visualize(self):
-
-        field = ""
-
-        grid = [['.' for _ in range(self.width)] for _ in range(self.height)]
-        for molecule in self.molecules:
-            x, y = int(molecule.x), int(molecule.y)
-            if 0 <= x < self.width and 0 <= y < self.height:
-                grid[y][x] = str(molecule.energy)#'O'
-
-        for row in grid:
-            field += ''.join(row) + "\n"
-
-        field += "\n" + "-" * self.width + "\n"
-
-        return field
-
-
-def run_simulation(steps, initial_molecule_count):
-    os.environ['TERM'] = 'xterm-256color'
-    env = Environment(100, 30, initial_molecule_count)
-    for _ in range(steps):
-        f = env.step()
-        sys.stdout.write('\033[2J\033[H')
-        sys.stdout.flush()
-        print(f)
-        time.sleep(0.33)
-
-if __name__ == "__main__":
-    run_simulation(steps=1000, initial_molecule_count=50)
+                
+controller = BookController()
+view = BookView(controller)
+view.run()
